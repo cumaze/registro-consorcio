@@ -1,11 +1,21 @@
+import './globals.css'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Registro Académico NIU',
+  description: 'Sistema de gestión de registros académicos',
+}
+
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="es">
+      <body className="min-h-screen bg-background font-sans antialiased">
+        {children}
+      </body>
     </html>
-  );
+  )
 }
