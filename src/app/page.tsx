@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -124,7 +123,7 @@ export default function Home() {
     setAcademicData(prevData => {
       if (!prevData) return null;
 
-      const gradeLevelLower = student.gradeLevel.toLowerCase();
+      const gradeLevelLower = student.gradeLevel?.toLowerCase() || '';
       let numToSelect = 0;
 
       if (gradeLevelLower.includes('licenciatura')) {
