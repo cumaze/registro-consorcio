@@ -353,4 +353,3 @@ export function FileUploader({
   );
 }
 
-export { FileUploader };
