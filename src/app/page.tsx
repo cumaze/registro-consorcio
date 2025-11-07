@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainDashboard } from '@/components/dashboard/main-dashboard';
 import { FileUploader } from "@/components/dashboard/file-uploader";
 import { StudentSelector } from "@/components/dashboard/student-selector";
@@ -18,7 +18,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-
 type AcademicData = {
   students: Student[];
   coursesByStudent: Record<string, Course[]>;
@@ -32,12 +31,24 @@ export type SpecializationCourses = {
 
 const DEFAULT_LOGO_URL = "https://firebasestorage.googleapis.com/v0/b/test-project-96eea.appspot.com/o/ni-logo.png?alt=media&token=89437976-96b5-4b0d-a36c-941c39050f4a";
 
+// Estado para el nombre de la universidad
+const DEFAULT_UNIVERSITY_NAME = "Consortium Universitas";
+
+// Evitar hidratación para el nombre de la universidad
+const useClient = () => {
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+  return isClient;
+};
 
 export default function Home() {
   const [academicData, setAcademicData] = useState<AcademicData | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [logoUrl, setLogoUrl] = useState<string>(DEFAULT_LOGO_URL);
-
+  const [universityName, setUniversityName] = useState<string>(DEFAULT_UNIVERSITY_NAME);
+  
   const [counselorSignature, setCounselorSignature] = useState<string | null>(null);
   const [secretarySignature, setSecretarySignature] = useState<string | null>(null);
   const [coordinatorSignature, setCoordinatorSignature] = useState<string | null>(null);
@@ -50,6 +61,25 @@ export default function Home() {
   
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [newCourseName, setNewCourseName] = useState("");
+
+  const isClient = useClient();
+
+  // Cargar nombre guardado al iniciar
+  useEffect(() => {
+    if (isClient) {
+      const savedName = localStorage.getItem('universityName');
+      if (savedName) {
+        setUniversityName(savedName);
+      }
+    }
+  }, [isClient]);
+
+  const handleUniversityNameChange = (newName: string) => {
+    setUniversityName(newName);
+    if (isClient) {
+      localStorage.setItem('universityName', newName);
+    }
+  };
 
   const handleStartEditingCourse = (course: Course) => {
     setEditingCourse(course);
@@ -83,7 +113,6 @@ export default function Home() {
     setEditingCourse(null);
     setNewCourseName("");
   };
-
 
   const handleUpload = (newData: AcademicData) => {
     setAcademicData(prevData => {
@@ -228,17 +257,25 @@ export default function Home() {
 
   // 1. Show file uploader if no data
   if (!academicData) {
+    if (!isClient) {
+      return <div className="flex min-h-screen w-full items-center justify-center bg-gray-100 p-4 font-body">Cargando...</div>;
+    }
+
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-gray-100 p-4 font-body">
-        <FileUploader 
-          onUpload={handleUpload} 
-          onLogoUpload={handleLogoUpload} 
-          logoUrl={logoUrl}
-          onSignatureUpload={handleSignatureUpload}
-          setCounselorSignature={setCounselorSignature}
-          setSecretarySignature={setSecretarySignature}
-          setCoordinatorSignature={setCoordinatorSignature}
-        />
+        <div className="w-full max-w-4xl">
+          <FileUploader 
+            onUpload={handleUpload} 
+            onLogoUpload={handleLogoUpload} 
+            logoUrl={logoUrl}
+            onSignatureUpload={handleSignatureUpload}
+            setCounselorSignature={setCounselorSignature}
+            setSecretarySignature={setSecretarySignature}
+            setCoordinatorSignature={setCoordinatorSignature}
+            universityName={universityName}
+            onUniversityNameChange={handleUniversityNameChange}
+          />
+        </div>
       </div>
     );
   }
@@ -247,14 +284,17 @@ export default function Home() {
   if (!selectedStudent) {
     return (
        <div className="flex min-h-screen w-full flex-col items-center bg-gray-100 p-4 font-body">
-        <StudentSelector 
-          students={academicData.students} 
-          onSelectStudent={handleSelectStudent}
-          onReset={handleReset}
-          logoUrl={logoUrl}
-          onDeleteBatch={handleDeleteBatch}
-          onSpecializationUpload={handleSpecializationUpload}
-        />
+        <div className="w-full max-w-6xl">
+          <StudentSelector 
+            students={academicData.students} 
+            onSelectStudent={handleSelectStudent}
+            onReset={handleReset}
+            logoUrl={logoUrl}
+            onDeleteBatch={handleDeleteBatch}
+            onSpecializationUpload={handleSpecializationUpload}
+            universityName={universityName}
+          />
+        </div>
        </div>
     );
   }
@@ -305,6 +345,7 @@ export default function Home() {
           secretarySignature={secretarySignature}
           coordinatorSignature={coordinatorSignature}
           onEditCourse={handleStartEditingCourse}
+          universityName={universityName}
         />
       </div>
     </>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRef } from "react";
@@ -27,6 +26,8 @@ type FileUploaderProps = {
   setCounselorSignature: React.Dispatch<React.SetStateAction<string | null>>;
   setSecretarySignature: React.Dispatch<React.SetStateAction<string | null>>;
   setCoordinatorSignature: React.Dispatch<React.SetStateAction<string | null>>;
+  universityName: string;
+  onUniversityNameChange?: (newName: string) => void;
 };
 
 type GradeLevel = 'Licenciatura' | 'Maestria' | 'Doctorado';
@@ -58,7 +59,6 @@ const normalizeKey = (key: string): string => {
     .replace(/\s+/g, ''); // replace spaces
 };
 
-
 export function FileUploader({ 
   onUpload, 
   onLogoUpload, 
@@ -66,7 +66,9 @@ export function FileUploader({
   onSignatureUpload, 
   setCounselorSignature, 
   setSecretarySignature, 
-  setCoordinatorSignature 
+  setCoordinatorSignature,
+  universityName,
+  onUniversityNameChange 
 }: FileUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +78,14 @@ export function FileUploader({
   const { toast } = useToast();
   const currentGradeLevelRef = useRef<GradeLevel>('Maestria');
 
+  const handleUniversityNameChange = () => {
+    const newName = prompt("Nuevo nombre de la universidad:", universityName);
+    if (newName && newName.trim() !== "" && newName !== universityName) {
+      if (onUniversityNameChange) {
+        onUniversityNameChange(newName);
+      }
+    }
+  };
 
   const handleExcelButtonClick = (gradeLevel: GradeLevel) => {
     currentGradeLevelRef.current = gradeLevel;
@@ -176,7 +186,6 @@ export function FileUploader({
           }
         });
 
-
         const coursesSheetName = workbook.SheetNames[1];
         const coursesWorksheet = workbook.Sheets[coursesSheetName];
         let coursesByStudent: Record<string, Course[]> = {};
@@ -221,7 +230,6 @@ export function FileUploader({
                     }
                     return course;
                 });
-
 
                 studentCourses = finalDoctorateCourses;
             } else { // Default to Maestria
@@ -282,10 +290,20 @@ export function FileUploader({
   return (
     <Card className="w-full max-w-lg animate-fade-in-up shadow-2xl">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 relative">
+        <div className="mx-auto mb-2 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 relative">
           <Image src={logoUrl} alt="Logo" width={64} height={64} className="rounded-full" crossOrigin="anonymous"/>
         </div>
-        <CardTitle className="font-headline text-3xl text-primary">Registro Académico NIU</CardTitle>
+        {/* Nombre de la universidad y botón para cambiar */}
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">{universityName}</h2>
+          <button
+            onClick={handleUniversityNameChange}
+            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+          >
+            ✏️ Cambiar Nombre
+          </button>
+        </div>
+        <CardTitle className="font-headline text-3xl text-primary">Registro Académico</CardTitle>
         <CardDescription className="text-md">
           Sube tu archivo de Excel, el logo y las firmas para generar los reportes.
         </CardDescription>
@@ -334,3 +352,5 @@ export function FileUploader({
     </Card>
   );
 }
+
+export { FileUploader };

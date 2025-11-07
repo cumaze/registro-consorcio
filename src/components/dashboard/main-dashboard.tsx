@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useRef, useState, useEffect } from 'react';
@@ -26,6 +25,7 @@ type MainDashboardProps = {
   secretarySignature: string | null;
   coordinatorSignature: string | null;
   onEditCourse: (course: Course) => void;
+  universityName: string;
 };
 
 type ActiveDocument = 'kardex' | 'homologacion' | 'tesis' | 'cierre';
@@ -40,9 +40,19 @@ const getNewGradeDetails = (numericGrade: number): { alphabetic: string, systemE
     return { alphabetic: "F", systemE: "INSUFICIENTE" };
 };
 
-export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl, counselorSignature, secretarySignature, coordinatorSignature, onEditCourse }: MainDashboardProps) {
+export function MainDashboard({ 
+  student, 
+  courses, 
+  onReset, 
+  onBackToList, 
+  logoUrl, 
+  counselorSignature, 
+  secretarySignature, 
+  coordinatorSignature, 
+  onEditCourse,
+  universityName 
+}: MainDashboardProps) {
   const reportRef = useRef<HTMLDivElement>(null);
-  const [universityName, setUniversityName] = useState(student.university);
   const [calculatedAverage, setCalculatedAverage] = useState(0);
   const [activeDocument, setActiveDocument] = useState<ActiveDocument>('kardex');
   const [documentTitle, setDocumentTitle] = useState('Registro Académico');
@@ -50,7 +60,6 @@ export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl
   const [thesisGrade, setThesisGrade] = useState<{ numeric: number; alphabetic: string; systemE: string; } | null>(null);
 
   useEffect(() => {
-    setUniversityName(student.university === 'N/A' ? '' : student.university);
     if (student.thesisCredits > 0) {
       const numericGrade = Math.floor(Math.random() * (100 - 83 + 1)) + 83;
       const { alphabetic, systemE } = getNewGradeDetails(numericGrade);
@@ -154,6 +163,7 @@ export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl
           onAverageCalculated={setCalculatedAverage}
           thesisGrade={thesisGrade}
           onEditCourse={onEditCourse}
+          universityName={universityName}
         />
       );
     } else if (gradeLevel.includes('doctorado')) {
@@ -164,6 +174,7 @@ export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl
           onAverageCalculated={setCalculatedAverage}
           thesisGrade={thesisGrade}
           onEditCourse={onEditCourse}
+          universityName={universityName}
         />
       );
     } else { // Default to Maestria
@@ -174,6 +185,7 @@ export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl
           onAverageCalculated={setCalculatedAverage}
           thesisGrade={thesisGrade}
           onEditCourse={onEditCourse}
+          universityName={universityName}
         />
       );
     }
@@ -201,7 +213,7 @@ export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl
   const renderContent = () => {
     switch (activeDocument) {
       case 'homologacion':
-        return <HomologacionCursos student={student} courses={courses} />;
+        return <HomologacionCursos student={student} courses={courses} universityName={universityName} />;
       case 'tesis':
         return (
           <TesisGradeReport
@@ -210,6 +222,7 @@ export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl
             secretarySignature={secretarySignature}
             coordinatorSignature={coordinatorSignature}
             thesisGrade={thesisGrade}
+            universityName={universityName}
           />
         );
       case 'cierre':
@@ -219,6 +232,7 @@ export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl
             counselorSignature={counselorSignature}
             secretarySignature={secretarySignature}
             coordinatorSignature={coordinatorSignature}
+            universityName={universityName}
           />
         );
       case 'kardex':
