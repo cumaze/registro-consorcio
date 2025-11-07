@@ -2,7 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Registro Académico NIU',
+  title: 'registro-consortium-universitas',
   description: 'Sistema de gestión de registros académicos',
 }
 
