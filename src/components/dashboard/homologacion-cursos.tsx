@@ -1,74 +1,150 @@
-
 "use client";
 
-import type { Course, Student } from "@/lib/academic-data";
-import { inductionCourses, professionalCourses, licenciaturaCursosProfesionales, doctoradoCursosProfesionales } from "@/lib/academic-data";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useEffect, useState } from "react";
+import type { Student, Course } from "@/lib/academic-data";
 
 type HomologacionCursosProps = {
-    student: Student;
-    courses: Course[];
+  student: Student;
+  courses: Course[];
 };
 
+/**
+ * Solo contamos como “Profesionalización” los cursos que el Kardex ya tiene con estos prefijos:
+ * - Maestría:      "prof-"
+ * - Licenciatura:  "lic-prof-"
+ * - Doctorado:     "doc-prof-"
+ * - Técnico:       "tec-prof-"
+ *
+ * EXCLUIMOS:
+ * - Especialización: "spec-"  (NO se muestran)
+ * - Inducción/básicos (no usan esos prefijos)
+ */
+function esProfesionalizacionKardex(c: Course) {
+  const id = String(c?.id || "").toLowerCase();
+  return (
+    id.startsWith("prof-") ||
+    id.startsWith("lic-prof-") ||
+    id.startsWith("doc-prof-") ||
+    id.startsWith("tec-prof-")
+  );
+}
+
 export function HomologacionCursos({ student, courses }: HomologacionCursosProps) {
+  const [universityName, setUniversityName] = useState("Consortium Universitas");
 
-    const inductionCourseNames = new Set(inductionCourses.map(ic => ic.name));
-    
-    // We want to show only "Cursos Básicos" and "Cursos Optativos Profesionales"
-    const professionalCourseSet = new Set([
-        ...professionalCourses.map(c => c.name),
-        ...licenciaturaCursosProfesionales.map(c => c.name),
-        ...doctoradoCursosProfesionales.map(c => c.name)
-    ]);
-    
-    const filteredCourses = courses.filter(course => 
-        !inductionCourseNames.has(course.name) &&
-        !course.id.startsWith('spec-') && // Exclude specialization courses by id prefix
-        !course.name.toLowerCase().includes("tesis")
-    );
-    
-    const tableRows = filteredCourses.map(course => {
-        return {
-            niuCourse: course,
-            usmCourse: course, 
-        };
-    });
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("universityName");
+      if (stored && stored.trim() !== "") setUniversityName(stored);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-    const studentName = `${student.firstName} ${student.lastName}`;
+  // Solo los que YA están en el Kardex y son de profesionalización según prefijos.
+  const filtered = (courses || []).filter(
+    (c) => c?.name?.trim() && esProfesionalizacionKardex(c)
+  );
 
-    return (
-        <div className="p-4 bg-white text-gray-800">
+  // Mapeo 1:1 (NIU ⇄ Origen) usando el mismo nombre en ambas columnas.
+  const rows = filtered.map((c, i) => ({
+    niu: c.name,
+    usm: c.name,
+    key: c.id || `${c.name}-${i}`,
+  }));
 
-            <div className="text-sm space-y-1 mb-6">
-                <p><span className="font-semibold">PARA:</span> DEPARTAMENTO DE ADMISIONES</p>
-                <p><span className="font-semibold">DE:</span> VICERRECTORIA ACADEMICA</p>
-                <p><span className="font-semibold">ASUNTO:</span> Propuesta de Homologación de Cursos</p>
-                <p><span className="font-semibold">FECHA:</span> {new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                 {student.careerName && student.careerName !== 'N/A' && (
-                    <p><span className="font-semibold">CARRERA:</span> {student.careerName}</p>
-                 )}
-            </div>
-            
-            <p className="mb-6">
-                Presento a continuación la propuesta de homologación de cursos del programa de <span className="font-bold">{student.gradeLevel} en {student.affectation}</span>, para el estudiante <span className="font-bold">{studentName}</span> con número de ID <span className="font-bold">{student.studentId}</span>.
-            </p>
+  const carrera =
+    student?.careerName && student.careerName !== "N/A"
+      ? student.careerName
+      : "Carrera";
 
-            <Table>
-                <TableHeader>
-                    <TableRow className="bg-gray-800 hover:bg-gray-800">
-                        <TableHead className="text-white font-bold text-center">Cursos NIU</TableHead>
-                        <TableHead className="text-white font-bold text-center">Cursos USM</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {tableRows.map((row, index) => (
-                        <TableRow key={index}>
-                            <TableCell className="border p-2">{row.niuCourse?.name || ''}</TableCell>
-                            <TableCell className="border p-2">{row.usmCourse?.name || ''}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    );
+  const facultad =
+    student?.school && student.school !== "N/A"
+      ? student.school
+      : "Facultad";
+
+  const grado = student?.gradeLevel || "Programa";
+  const nombreEstudiante =
+    `${student?.firstName ?? ""} ${student?.lastName ?? ""}`.trim() ||
+    "Estudiante";
+  const idEstudiante = student?.studentId || "ID";
+
+  return (
+    <div className="p-4 text-gray-900">
+      {/* Encabezado */}
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold text-blue-900 mb-1">
+          CUADRO COMPARATIVO DE CURSOS HOMOLOGADOS
+        </h1>
+      </div>
+
+      {/* Cuerpo tipo memo - SIN FECHA */}
+      <div className="mb-6 text-sm leading-6">
+        <p>
+          <span className="font-semibold">PARA:</span> DEPARTAMENTO DE ADMISIONES
+        </p>
+        <p>
+          <span className="font-semibold">DE:</span> VICERRECTORÍA ACADÉMICA
+        </p>
+        <p>
+          <span className="font-semibold">ASUNTO:</span> Propuesta de
+          Homologación de Cursos
+        </p>
+        {/* FECHA eliminada */}
+        <p className="mt-1">
+          <span className="font-semibold">CARRERA:</span> {carrera}
+        </p>
+
+        <p className="mt-4">
+          Presento a continuación la propuesta de homologación de cursos de
+          <span className="font-semibold"> profesionalización</span> del
+          programa de {grado} en {facultad}, para el estudiante{" "}
+          <span className="font-semibold">{nombreEstudiante}</span> con número
+          de ID <span className="font-semibold">{idEstudiante}</span>.
+        </p>
+      </div>
+
+      {/* Cuadro comparativo: SOLO Profesionalización del Kardex */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse border border-gray-400 text-sm">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="border border-gray-400 px-2 py-1 w-10">No.</th>
+              <th className="border border-gray-400 px-2 py-1">
+                Cursos {universityName}
+              </th>
+              <th className="border border-gray-400 px-2 py-1">
+                Cursos Universidad de Origen
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  className="border border-gray-400 px-2 py-2 text-center"
+                  colSpan={3}
+                >
+                  No hay cursos de profesionalización para mostrar.
+                </td>
+              </tr>
+            ) : (
+              rows.map((r, i) => (
+                <tr
+                  key={r.key}
+                  className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                >
+                  <td className="border border-gray-400 px-2 py-1 text-center">
+                    {i + 1}
+                  </td>
+                  <td className="border border-gray-400 px-2 py-1">{r.niu}</td>
+                  <td className="border border-gray-400 px-2 py-1">{r.usm}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
