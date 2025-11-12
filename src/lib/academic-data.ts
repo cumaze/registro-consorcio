@@ -149,6 +149,24 @@ export const licenciaturaCursosProfesionales: Partial<Course>[] = [
     { name: "Estrategias de negociación y ventas", credits: 5.7 },
 ];
 
+// --- Cursos de Técnico ---
+export const tecnicoCursosProfesionales: Partial<Course>[] = [
+    { name: "Marketing digital", credits: 4.33 },
+    { name: "Publicidad, promoción y manejo de medios", credits: 4.33 },
+    { name: "Liderazgo y conducción de equipos", credits: 4.33 },
+    { name: "Comunicación eficaz", credits: 4.33 },
+    { name: "Finanzas internacionales y corporativas", credits: 4.33 },
+    { name: "Competencias gerenciales", credits: 4.33 },
+    { name: "Administración fiscal financiera", credits: 4.33 },
+    { name: "Provisión y capacitación del factor humano", credits: 4.33 },
+    { name: "Innovaciones tecnológicas en la administración", credits: 4.33 },
+    { name: "Derecho laboral", credits: 4.33 },
+    { name: "Seguridad social", credits: 4.33 },
+    { name: "Teoría del comercio internacional", credits: 4.33 },
+    { name: "Ingeniería financiera y valuación", credits: 4.33 },
+    { name: "Creatividad e innovación aplicada", credits: 4.33 },
+    { name: "Estrategias de negociación y ventas", credits: 4.33 },
+];
 
 // --- Cursos de Doctorado ---
 export const doctoradoCursosBasicos: Partial<Course>[] = [
@@ -210,3 +228,6 @@ export const validateCourse = (course: Course): string[] => {
   }
   return errors;
 };
+
+// No longer used, but kept for reference
+export const specializationCourses: Partial<Course>[] = [];

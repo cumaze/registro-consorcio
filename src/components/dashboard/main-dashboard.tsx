@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Header } from "@/components/layout/header";
@@ -8,6 +9,8 @@ import { InfoCards } from "./info-cards";
 import { AcademicRecordTable as MaestriaRecordTable } from "./maestria-record-table";
 import { LicenciaturaRecordTable } from "./licenciatura-record-table";
 import { DoctoradoRecordTable } from "./doctorado-record-table";
+import { TecnicoRecordTable } from "./tecnico-record-table";
+import { PosdoctoradoRecordTable } from './posdoctorado-record-table';
 import { HomologacionCursos } from "./homologacion-cursos";
 import { TesisGradeReport } from "./tesis-grade-report";
 import { CierrePensum } from "./cierre-pensum";
@@ -25,7 +28,6 @@ type MainDashboardProps = {
   secretarySignature: string | null;
   coordinatorSignature: string | null;
   onEditCourse: (course: Course) => void;
-  universityName: string;
 };
 
 type ActiveDocument = 'kardex' | 'homologacion' | 'tesis' | 'cierre';
@@ -40,26 +42,21 @@ const getNewGradeDetails = (numericGrade: number): { alphabetic: string, systemE
     return { alphabetic: "F", systemE: "INSUFICIENTE" };
 };
 
-export function MainDashboard({ 
-  student, 
-  courses, 
-  onReset, 
-  onBackToList, 
-  logoUrl, 
-  counselorSignature, 
-  secretarySignature, 
-  coordinatorSignature, 
-  onEditCourse,
-  universityName 
-}: MainDashboardProps) {
+export function MainDashboard({ student, courses, onReset, onBackToList, logoUrl, counselorSignature, secretarySignature, coordinatorSignature, onEditCourse }: MainDashboardProps) {
   const reportRef = useRef<HTMLDivElement>(null);
+  const [universityName, setUniversityName] = useState(student.university);
   const [calculatedAverage, setCalculatedAverage] = useState(0);
   const [activeDocument, setActiveDocument] = useState<ActiveDocument>('kardex');
   const [documentTitle, setDocumentTitle] = useState('Registro Académico');
   const [showInfoCards, setShowInfoCards] = useState(true);
   const [thesisGrade, setThesisGrade] = useState<{ numeric: number; alphabetic: string; systemE: string; } | null>(null);
+  
+  const handleAverageCalculated = useCallback((average: number) => {
+    setCalculatedAverage(average);
+  }, []);
 
   useEffect(() => {
+    setUniversityName(student.university === 'N/A' ? '' : student.university);
     if (student.thesisCredits > 0) {
       const numericGrade = Math.floor(Math.random() * (100 - 83 + 1)) + 83;
       const { alphabetic, systemE } = getNewGradeDetails(numericGrade);
@@ -160,10 +157,19 @@ export function MainDashboard({
         <LicenciaturaRecordTable
           records={courses}
           student={student}
-          onAverageCalculated={setCalculatedAverage}
+          onAverageCalculated={handleAverageCalculated}
           thesisGrade={thesisGrade}
           onEditCourse={onEditCourse}
-          universityName={universityName}
+        />
+      );
+    } else if (gradeLevel.includes('posdoctorado')) {
+      return (
+        <PosdoctoradoRecordTable
+          records={courses}
+          student={student}
+          onAverageCalculated={handleAverageCalculated}
+          thesisGrade={thesisGrade}
+          onEditCourse={onEditCourse}
         />
       );
     } else if (gradeLevel.includes('doctorado')) {
@@ -171,21 +177,29 @@ export function MainDashboard({
         <DoctoradoRecordTable
           records={courses}
           student={student}
-          onAverageCalculated={setCalculatedAverage}
+          onAverageCalculated={handleAverageCalculated}
           thesisGrade={thesisGrade}
           onEditCourse={onEditCourse}
-          universityName={universityName}
         />
       );
-    } else { // Default to Maestria
+    } else if (gradeLevel.includes('técnico')) {
+      return (
+        <TecnicoRecordTable
+          records={courses}
+          student={student}
+          onAverageCalculated={handleAverageCalculated}
+          thesisGrade={thesisGrade}
+          onEditCourse={onEditCourse}
+        />
+      );
+    }
+    else { // Default to Maestria
       return (
         <MaestriaRecordTable
           records={courses}
           student={student}
-          onAverageCalculated={setCalculatedAverage}
+          onAverageCalculated={handleAverageCalculated}
           thesisGrade={thesisGrade}
-          onEditCourse={onEditCourse}
-          universityName={universityName}
         />
       );
     }
@@ -213,7 +227,7 @@ export function MainDashboard({
   const renderContent = () => {
     switch (activeDocument) {
       case 'homologacion':
-        return <HomologacionCursos student={student} courses={courses} universityName={universityName} />;
+        return <HomologacionCursos student={student} courses={courses} />;
       case 'tesis':
         return (
           <TesisGradeReport
@@ -222,7 +236,6 @@ export function MainDashboard({
             secretarySignature={secretarySignature}
             coordinatorSignature={coordinatorSignature}
             thesisGrade={thesisGrade}
-            universityName={universityName}
           />
         );
       case 'cierre':
@@ -232,7 +245,6 @@ export function MainDashboard({
             counselorSignature={counselorSignature}
             secretarySignature={secretarySignature}
             coordinatorSignature={coordinatorSignature}
-            universityName={universityName}
           />
         );
       case 'kardex':
@@ -289,3 +301,5 @@ export function MainDashboard({
     </div>
   );
 }
+
+    

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useRef } from "react";
@@ -37,7 +38,7 @@ type StudentSelectorProps = {
   ) => void;
 };
 
-type GradeLevelFilter = 'Licenciatura' | 'Maestria' | 'Doctorado' | 'Todos';
+type GradeLevelFilter = 'Técnico' | 'Licenciatura' | 'Maestria' | 'Doctorado' | 'Posdoctorado' | 'Todos';
 
 export function StudentSelector({ students, onSelectStudent, onReset, logoUrl, onDeleteBatch, onSpecializationUpload }: StudentSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,23 +61,41 @@ export function StudentSelector({ students, onSelectStudent, onReset, logoUrl, o
     const fileName = file.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     let isValid = false;
     let gradeLevel: keyof SpecializationCourses | null = null;
+    let expectedFileName = "";
 
-    if (fileName.startsWith('especializacion licenciatura')) {
+    if (fileName.startsWith('especializacion tecnico')) {
+        isValid = true;
+        gradeLevel = 'tecnico';
+        expectedFileName = 'especializacion tecnico.xlsx';
+    } else if (fileName.startsWith('especializacion licenciatura')) {
       isValid = true;
       gradeLevel = 'licenciatura';
+      expectedFileName = 'especializacion licenciatura.xlsx';
     } else if (fileName.startsWith('especializacion maestria') || fileName.startsWith('especializacion maestria')) {
       isValid = true;
       gradeLevel = 'maestria';
+      expectedFileName = 'especializacion maestria.xlsx';
     } else if (fileName.startsWith('especializacion doctorado')) {
       isValid = true;
       gradeLevel = 'doctorado';
+      expectedFileName = 'especializacion doctorado.xlsx';
+    } else if (fileName.includes('pos doctorado') || fileName.includes('postdoctorado')) {
+      isValid = true;
+      gradeLevel = 'doctorado'; // Use 'doctorado' key for both
+      expectedFileName = 'especializacion posdoctorado.xlsx';
     }
 
     if (!isValid || !gradeLevel) {
+      const studentGradeLevel = studentForUpload.gradeLevel.toLowerCase();
+      let expectedName = `especializacion ${studentGradeLevel}.xlsx`;
+      if (studentGradeLevel === 'posdoctorado') {
+        expectedName = 'especializacion posdoctorado.xlsx';
+      }
+      
       toast({
         variant: "destructive",
         title: "Archivo de especialización incorrecto",
-        description: "El nombre debe ser 'especialización [licenciatura|maestria|doctorado].xlsx'",
+        description: `El nombre del archivo debe ser '${expectedName}'.`,
       });
       if (specializationFileInputRef.current) {
         specializationFileInputRef.current.value = "";
@@ -99,7 +118,7 @@ export function StudentSelector({ students, onSelectStudent, onReset, logoUrl, o
 
       toast({
         title: "Éxito",
-        description: `Cursos de especialización para ${gradeLevel} cargados correctamente y asignados a ${studentForUpload.firstName}.`
+        description: `Cursos de especialización para ${fileName.split(' ')[1]} cargados y asignados a ${studentForUpload.firstName}.`
       });
 
     } catch (error: any) {
@@ -149,11 +168,13 @@ export function StudentSelector({ students, onSelectStudent, onReset, logoUrl, o
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex justify-center gap-2 mb-4">
+                <div className="flex justify-center gap-2 mb-4 flex-wrap">
                     <Button variant={gradeLevelFilter === 'Todos' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Todos')}>Todos</Button>
+                    <Button variant={gradeLevelFilter === 'Técnico' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Técnico')}>Técnico</Button>
                     <Button variant={gradeLevelFilter === 'Licenciatura' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Licenciatura')}>Licenciatura</Button>
                     <Button variant={gradeLevelFilter === 'Maestria' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Maestria')}>Maestría</Button>
                     <Button variant={gradeLevelFilter === 'Doctorado' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Doctorado')}>Doctorado</Button>
+                    <Button variant={gradeLevelFilter === 'Posdoctorado' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Posdoctorado')}>Pos Doctorado</Button>
                 </div>
                 <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -241,3 +262,5 @@ export function StudentSelector({ students, onSelectStudent, onReset, logoUrl, o
     </div>
   );
 }
+
+    

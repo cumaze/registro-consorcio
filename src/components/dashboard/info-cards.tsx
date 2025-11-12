@@ -1,3 +1,4 @@
+
 import type { Student, Course } from "@/lib/academic-data";
 
 type InfoCardsProps = {
@@ -30,7 +31,9 @@ export function InfoCards({ student, courses, calculatedAverage }: InfoCardsProp
     const gradeLevelLower = student.gradeLevel.toLowerCase();
     if (gradeLevelLower.includes('licenciatura')) return 285;
     if (gradeLevelLower.includes('maestria')) return 135;
+    if (gradeLevelLower.includes('posdoctorado')) return 80;
     if (gradeLevelLower.includes('doctorado')) return 123;
+    if (gradeLevelLower.includes('técnico')) return 143;
     return 0;
   };
   const totalCredits = getTotalCredits();
@@ -39,7 +42,9 @@ export function InfoCards({ student, courses, calculatedAverage }: InfoCardsProp
     const gradeLevelLower = student.gradeLevel.toLowerCase();
     if (gradeLevelLower.includes('licenciatura')) return '2850 horas';
     if (gradeLevelLower.includes('maestria')) return '1350 horas';
+    if (gradeLevelLower.includes('posdoctorado')) return '1030 horas';
     if (gradeLevelLower.includes('doctorado')) return '1230 horas';
+    if (gradeLevelLower.includes('técnico')) return '1430 horas';
     return 'N/A';
   };
 
@@ -63,7 +68,7 @@ export function InfoCards({ student, courses, calculatedAverage }: InfoCardsProp
                   <p className="font-semibold text-sm">{student.careerName}</p>
               </div>
             )}
-             <div className="p-1">
+             <div className="border-t-2 mt-1 p-1">
                 <p className="text-xs text-gray-500">Horas lectivas</p>
                 <p className="font-semibold text-sm">{getHorasLectivas()}</p>
             </div>
@@ -104,3 +109,5 @@ export function InfoCards({ student, courses, calculatedAverage }: InfoCardsProp
     </div>
   );
 }
+
+    

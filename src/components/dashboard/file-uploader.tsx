@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import { useRef } from "react";
@@ -16,6 +18,7 @@ import {
   licenciaturaCursosProfesionales,
   doctoradoCursosBasicos,
   doctoradoCursosProfesionales,
+  tecnicoCursosProfesionales,
 } from "@/lib/academic-data";
 
 type FileUploaderProps = {
@@ -26,11 +29,9 @@ type FileUploaderProps = {
   setCounselorSignature: React.Dispatch<React.SetStateAction<string | null>>;
   setSecretarySignature: React.Dispatch<React.SetStateAction<string | null>>;
   setCoordinatorSignature: React.Dispatch<React.SetStateAction<string | null>>;
-  universityName: string;
-  onUniversityNameChange?: (newName: string) => void;
 };
 
-type GradeLevel = 'Licenciatura' | 'Maestria' | 'Doctorado';
+type GradeLevel = 'Licenciatura' | 'Maestria' | 'Doctorado' | 'Técnico' | 'Posdoctorado';
 
 // Function to shuffle an array and pick the first N elements
 const getRandomSubarray = (arr: any[], n: number, seed: string) => {
@@ -59,6 +60,7 @@ const normalizeKey = (key: string): string => {
     .replace(/\s+/g, ''); // replace spaces
 };
 
+
 export function FileUploader({ 
   onUpload, 
   onLogoUpload, 
@@ -66,9 +68,7 @@ export function FileUploader({
   onSignatureUpload, 
   setCounselorSignature, 
   setSecretarySignature, 
-  setCoordinatorSignature,
-  universityName,
-  onUniversityNameChange 
+  setCoordinatorSignature 
 }: FileUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -78,14 +78,6 @@ export function FileUploader({
   const { toast } = useToast();
   const currentGradeLevelRef = useRef<GradeLevel>('Maestria');
 
-  const handleUniversityNameChange = () => {
-    const newName = prompt("Nuevo nombre de la universidad:", universityName);
-    if (newName && newName.trim() !== "" && newName !== universityName) {
-      if (onUniversityNameChange) {
-        onUniversityNameChange(newName);
-      }
-    }
-  };
 
   const handleExcelButtonClick = (gradeLevel: GradeLevel) => {
     currentGradeLevelRef.current = gradeLevel;
@@ -103,16 +95,28 @@ export function FileUploader({
     if (file) {
       const fileName = file.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       let isValid = false;
+      let expectedKeyword = "";
 
       switch(gradeLevelForUpload) {
         case 'Licenciatura':
           isValid = fileName.includes('licenciatura');
+          expectedKeyword = 'licenciatura';
           break;
         case 'Maestria':
           isValid = fileName.includes('maestria') || fileName.includes('maestria');
+          expectedKeyword = 'maestria';
           break;
         case 'Doctorado':
           isValid = fileName.includes('doctorado');
+          expectedKeyword = 'doctorado';
+          break;
+        case 'Técnico':
+          isValid = fileName.includes('tecnico');
+          expectedKeyword = 'tecnico';
+          break;
+        case 'Posdoctorado':
+          isValid = fileName.includes('posdoctorado') || fileName.includes('pos doctorado') || fileName.includes('postdoctorado');
+          expectedKeyword = 'posdoctorado';
           break;
       }
 
@@ -120,7 +124,7 @@ export function FileUploader({
         toast({
           variant: "destructive",
           title: "Archivo incorrecto",
-          description: "El documento no está nombrado correctamente. Por favor, verifica el nombre del archivo.",
+          description: `El nombre del archivo debe contener la palabra '${expectedKeyword}'.`,
         });
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -177,7 +181,7 @@ export function FileUploader({
             workExperienceCredits: Number(lookupStudent['creditosporexpiritualaboral'] || lookupStudent['creditosporexperiencialaboral']) || 0,
             meritCredits: Number(lookupStudent['creditosobtenidospormeritodeestudio']) || 0,
             gradeLevel: gradeLevelForUpload,
-            thesisCredits: Number(lookupStudent['creditosportesisdegraduacion']) || 0,
+            thesisCredits: Number(lookupStudent['creditosportesisdegraduacion']) || (gradeLevelForUpload === 'Técnico' ? 10 : (gradeLevelForUpload === 'Posdoctorado' ? 10: 0)),
             curriculumCloseDate: lookupStudent['nofechadecierredelpensum'] || 'N/A',
             affectation: lookupStudent['nombredelafacultad'] || 'N/A',
             average: Number(lookupStudent['promedio']) || 0,
@@ -185,6 +189,7 @@ export function FileUploader({
             careerName: lookupStudent['nombredelacarrera'] || lookupStudent['carrera'] || 'N/A',
           }
         });
+
 
         const coursesSheetName = workbook.SheetNames[1];
         const coursesWorksheet = workbook.Sheets[coursesSheetName];
@@ -206,7 +211,7 @@ export function FileUploader({
                     ...licenciaturaCursosBasicos.map(c => ({...c, id: `lic-bas-${c.name}`})),
                     ...getRandomSubarray(licenciaturaCursosProfesionales, 10, student.studentId + 'lic-prof').map(c => ({...c, id: `lic-prof-${c.name}`})),
                 ];
-            } else if (gradeLevel.includes('doctorado')) {
+            } else if (gradeLevel.includes('doctorado') || gradeLevel.includes('posdoctorado')) {
                 const mandatoryInduction = inductionCourses.map(c => ({...c, id: `ind-${c.name}`}));
                 const mandatoryBasic = doctoradoCursosBasicos.map(c => ({...c, id: `doc-bas-${c.name}`}));
                 const randomProfessional = getRandomSubarray(doctoradoCursosProfesionales, 4, student.studentId + 'doc-prof').map(c => ({...c, id: `doc-prof-${c.name}`}));
@@ -217,22 +222,16 @@ export function FileUploader({
                     ...randomProfessional,
                 ];
                 
-                // Shuffle the combined list to randomize credit assignment
                 allDoctorateCourses = allDoctorateCourses.sort(() => Math.random() - 0.5);
 
-                let count54 = 0;
-                const finalDoctorateCourses = allDoctorateCourses.map((course) => {
-                    if (count54 < 15) {
-                        course.credits = 5.4;
-                        count54++;
-                    } else {
-                        course.credits = 5.25;
-                    }
-                    return course;
-                });
-
-                studentCourses = finalDoctorateCourses;
-            } else { // Default to Maestria
+                studentCourses = allDoctorateCourses;
+            } else if (gradeLevel.includes('técnico')) {
+                 studentCourses = [
+                    ...inductionCourses.map(c => ({...c, id: `ind-${c.name}`})),
+                    ...getRandomSubarray(tecnicoCursosProfesionales, 5, student.studentId + 'tec-prof').map(c => ({...c, id: `tec-prof-${c.name}`})),
+                ];
+            }
+            else { // Default to Maestria
                 studentCourses = [
                     ...inductionCourses.map(c => ({...c, id: `ind-${c.name}`})),
                     ...maestriaCursosBasicos.map(c => ({...c, id: `bas-${c.name}`})),
@@ -290,20 +289,10 @@ export function FileUploader({
   return (
     <Card className="w-full max-w-lg animate-fade-in-up shadow-2xl">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-2 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 relative">
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 relative">
           <Image src={logoUrl} alt="Logo" width={64} height={64} className="rounded-full" crossOrigin="anonymous"/>
         </div>
-        {/* Nombre de la universidad y botón para cambiar */}
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-800 mb-2">{universityName}</h2>
-          <button
-            onClick={handleUniversityNameChange}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-          >
-            ✏️ Cambiar Nombre
-          </button>
-        </div>
-        <CardTitle className="font-headline text-3xl text-primary">Registro Académico</CardTitle>
+        <CardTitle className="font-headline text-3xl text-primary">Registro Académico NIU</CardTitle>
         <CardDescription className="text-md">
           Sube tu archivo de Excel, el logo y las firmas para generar los reportes.
         </CardDescription>
@@ -316,6 +305,10 @@ export function FileUploader({
         <input type="file" ref={coordinatorSignatureRef} onChange={(e) => onSignatureUpload(e, setCoordinatorSignature)} className="hidden" accept="image/*" />
 
         <div className="grid grid-cols-1 gap-2 w-full">
+            <Button onClick={() => handleExcelButtonClick('Técnico')} size="lg" className="w-full font-bold">
+              <UploadCloud className="mr-2 h-5 w-5" />
+              Importar Técnico (Excel)
+            </Button>
             <Button onClick={() => handleExcelButtonClick('Licenciatura')} size="lg" className="w-full font-bold">
               <UploadCloud className="mr-2 h-5 w-5" />
               Importar Licenciatura (Excel)
@@ -327,6 +320,10 @@ export function FileUploader({
             <Button onClick={() => handleExcelButtonClick('Doctorado')} size="lg" className="w-full font-bold">
               <UploadCloud className="mr-2 h-5 w-5" />
               Importar Doctorado (Excel)
+            </Button>
+            <Button onClick={() => handleExcelButtonClick('Posdoctorado')} size="lg" className="w-full font-bold">
+              <UploadCloud className="mr-2 h-5 w-5" />
+              Importar Pos Doctorado (Excel)
             </Button>
         </div>
 
@@ -352,4 +349,3 @@ export function FileUploader({
     </Card>
   );
 }
-
