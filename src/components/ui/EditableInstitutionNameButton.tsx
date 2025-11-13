@@ -12,16 +12,17 @@ export function EditableInstitutionNameButton() {
   const [tempName, setTempName] = useState(universityName);
 
   const handleSave = () => {
-    setUniversityName(tempName.trim() === "" ? "Consortium Universitas" : tempName);
+    const nameToSave = tempName.trim() === "" ? "Consortium Universitas" : tempName;
+    setUniversityName(nameToSave);
     setOpen(false);
   };
 
   return (
     <>
       <Button
-        className="w-full font-bold text-white"
-        style={{ backgroundColor: "#0f6d45" }}   // verde elegante
         size="lg"
+        className="w-full font-bold text-white"
+        style={{ backgroundColor: "#0f6d45" }} // Verde elegante
         onClick={() => {
           setTempName(universityName);
           setOpen(true);
@@ -39,7 +40,7 @@ export function EditableInstitutionNameButton() {
           <Input
             value={tempName}
             onChange={(e) => setTempName(e.target.value)}
-            placeholder="Escribe el nuevo nombre..."
+            placeholder="Escribe el nuevo nombre…"
             className="mt-4"
           />
 
@@ -48,7 +49,7 @@ export function EditableInstitutionNameButton() {
               Restablecer por defecto
             </Button>
 
-            <Button onClick={handleSave} className="bg-blue-700 text-white">
+            <Button className="bg-blue-700 text-white" onClick={handleSave}>
               Guardar
             </Button>
           </div>

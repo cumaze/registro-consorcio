@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -16,7 +16,6 @@ type AcademicRecordTableProps = {
   student: Student;
   onAverageCalculated: (average: number) => void;
   thesisGrade: { numeric: number; alphabetic: string; systemE: string; } | null;
-  onEditCourse: (course: Course) => void;
 };
 
 const getNewGradeDetails = (numericGrade: number): { alphabetic: string, systemE: string } => {
@@ -29,7 +28,7 @@ const getNewGradeDetails = (numericGrade: number): { alphabetic: string, systemE
     return { alphabetic: "F", systemE: "INSUFICIENTE" };
 };
 
-export function AcademicRecordTable({ records, student, onAverageCalculated, thesisGrade, onEditCourse }: AcademicRecordTableProps) {
+export function AcademicRecordTable({ records, student, onAverageCalculated, thesisGrade }: AcademicRecordTableProps) {
   const totalRows = 25; 
 
   const studentCourses = records.filter(c => c.name.toLowerCase() !== "tesis de graduación");
@@ -108,15 +107,15 @@ export function AcademicRecordTable({ records, student, onAverageCalculated, the
         courseCounter++;
 
         return (
-          <TableRow key={`${title}-${course.id}`} className="h-[38px]">
+          <TableRow key={`${title}-${course.id}`} className="h-[38px] group">
             <TableCell className="font-mono text-center border-x">{currentIndex + 1}</TableCell>
             <TableCell className="border-r">{student.curriculumCloseDate}</TableCell>
             <TableCell className="border-r">En línea</TableCell>
             <TableCell className="font-medium border-r">
               <div className="flex items-center justify-between">
                 <span>{course.name}</span>
-                {!isSpecialization && (
-                   <button onClick={() => onEditCourse(course)} className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                 {isSpecialization && (
+                   <button className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                      {/* No icon here */}
                    </button>
                 )}
@@ -202,5 +201,3 @@ export function AcademicRecordTable({ records, student, onAverageCalculated, the
     </div>
   );
 }
-
-    

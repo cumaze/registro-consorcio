@@ -150,6 +150,18 @@ export const licenciaturaCursosProfesionales: Partial<Course>[] = [
 ];
 
 // --- Cursos de Técnico ---
+export const tecnicoCursosBasicos: Partial<Course>[] = [
+    { name: "Teoría Económica", credits: 4.33 },
+    { name: "Bases Jurídicas de la empresa", credits: 4.33 },
+    { name: "Fundamentos de la administración", credits: 4.33 },
+    { name: "Fundamentos de Contabilidad", credits: 4.33 },
+    { name: "Derecho Mercantil", credits: 4.33 },
+    { name: "Desarrollo de Habilidades digitales", credits: 4.33 },
+    { name: "Estadística Aplicada a los Negocios", credits: 4.33 },
+    { name: "Ética y Responsabilidad Social Empresarial", credits: 4.33 },
+    { name: "Cultura Emprendedora", credits: 4.33 },
+];
+
 export const tecnicoCursosProfesionales: Partial<Course>[] = [
     { name: "Marketing digital", credits: 4.33 },
     { name: "Publicidad, promoción y manejo de medios", credits: 4.33 },

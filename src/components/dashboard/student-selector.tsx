@@ -1,208 +1,266 @@
+
+
 "use client";
 
-import { useRef, useState } from "react";
-import Image from "next/image";
-import * as XLSX from "xlsx";
+import { useState, useRef } from "react";
+import * as XLSX from 'xlsx';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { User, Search, FileText, Trash2, ShieldAlert, UploadCloud } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import type { Student, Course } from "@/lib/academic-data";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import type { SpecializationCourses } from "@/app/page";
 
-type Props = {
+type StudentSelectorProps = {
   students: Student[];
   onSelectStudent: (student: Student) => void;
   onReset: () => void;
   logoUrl: string;
   onDeleteBatch: (batchId: string) => void;
-  // ✅ Recibimos el callback que ya existe en Home
   onSpecializationUpload: (
     student: Student,
     courses: Partial<Course>[],
-    gradeLevel: "tecnico" | "licenciatura" | "maestria" | "doctorado"
+    gradeLevel: keyof SpecializationCourses
   ) => void;
 };
 
-function normalizeKey(key: string): string {
-  return key
-    ? key
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/ñ/g, "n")
-        .replace(/\s+/g, "")
-    : "";
-}
+type GradeLevelFilter = 'Técnico' | 'Licenciatura' | 'Maestria' | 'Doctorado' | 'Posdoctorado' | 'Todos';
 
-// Mapea el gradeLevel del estudiante al que espera Home
-function mapGradeLevel(student: Student): "tecnico" | "licenciatura" | "maestria" | "doctorado" {
-  const gl = (student.gradeLevel || "").toLowerCase();
-  if (gl.includes("técnico") || gl.includes("tecnico")) return "tecnico";
-  if (gl.includes("licenciatura")) return "licenciatura";
-  if (gl.includes("maestr")) return "maestria";
-  // Posdoctorado lo tratamos como doctorado (así estaba en Home)
-  return "doctorado";
-}
+export function StudentSelector({ students, onSelectStudent, onReset, logoUrl, onDeleteBatch, onSpecializationUpload }: StudentSelectorProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [gradeLevelFilter, setGradeLevelFilter] = useState<GradeLevelFilter>('Todos');
+  const specializationFileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const currentStudentRef = useRef<Student | null>(null);
 
-export function StudentSelector({
-  students,
-  onSelectStudent,
-  onReset,
-  logoUrl,
-  onDeleteBatch,
-  onSpecializationUpload,
-}: Props) {
-  // ✅ Un input oculto y guardamos el estudiante al que se le sube la especialización
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [studentForSpec, setStudentForSpec] = useState<Student | null>(null);
-
-  // Click en botón "Especialización" → abre file picker
-  const handleOpenSpecExcel = (student: Student) => {
-    setStudentForSpec(student);
-    fileInputRef.current?.click();
+  const handleSpecializationUploadClick = (student: Student) => {
+    currentStudentRef.current = student;
+    specializationFileInputRef.current?.click();
   };
 
-  // Cargar Excel de especialización → parsear → enviar arriba
-  const handleSpecFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !studentForSpec) {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+  const handleSpecializationFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const studentForUpload = currentStudentRef.current;
+
+    if (!file || !studentForUpload) return;
+
+    const fileName = file.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let isValid = false;
+    let gradeLevel: keyof SpecializationCourses | null = null;
+    let expectedFileName = "";
+
+    if (fileName.startsWith('especializacion tecnico')) {
+        isValid = true;
+        gradeLevel = 'tecnico';
+        expectedFileName = 'especializacion tecnico.xlsx';
+    } else if (fileName.startsWith('especializacion licenciatura')) {
+      isValid = true;
+      gradeLevel = 'licenciatura';
+      expectedFileName = 'especializacion licenciatura.xlsx';
+    } else if (fileName.startsWith('especializacion maestria') || fileName.startsWith('especializacion maestria')) {
+      isValid = true;
+      gradeLevel = 'maestria';
+      expectedFileName = 'especializacion maestria.xlsx';
+    } else if (fileName.startsWith('especializacion doctorado')) {
+      isValid = true;
+      gradeLevel = 'doctorado';
+      expectedFileName = 'especializacion doctorado.xlsx';
+    } else if (fileName.includes('pos doctorado') || fileName.includes('postdoctorado')) {
+      isValid = true;
+      gradeLevel = 'doctorado'; // Use 'doctorado' key for both
+      expectedFileName = 'especializacion posdoctorado.xlsx';
+    }
+
+    if (!isValid || !gradeLevel) {
+      const studentGradeLevel = studentForUpload.gradeLevel.toLowerCase();
+      let expectedName = `especializacion ${studentGradeLevel}.xlsx`;
+      if (studentGradeLevel === 'posdoctorado') {
+        expectedName = 'especializacion posdoctorado.xlsx';
+      }
+      
+      toast({
+        variant: "destructive",
+        title: "Archivo de especialización incorrecto",
+        description: `El nombre del archivo debe ser '${expectedName}'.`,
+      });
+      if (specializationFileInputRef.current) {
+        specializationFileInputRef.current.value = "";
+      }
       return;
     }
 
     try {
       const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: "array" });
-      // Tomamos la PRIMERA hoja como lista de cursos de especialización
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<any>(sheet, { raw: false, defval: "" });
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-      // Aceptamos encabezados típicos: code,codigo; name,nombre; credits,creditos
-      const parsed: Partial<Course>[] = rows.map((row: any) => {
-        const m: Record<string, any> = {};
-        for (const k in row) m[normalizeKey(k)] = row[k];
+      const courses = json.map(row => ({ name: row.name, credits: 5.4 }));
 
-        const name =
-          m["name"] ||
-          m["nombre"] ||
-          m["curso"] ||
-          m["asignatura"] ||
-          m["materia"] ||
-          "";
+      if (gradeLevel) {
+        onSpecializationUpload(studentForUpload, courses, gradeLevel);
+      }
 
-        const code = m["code"] || m["codigo"] || m["cod"] || "";
-        const creditsRaw = m["credits"] ?? m["creditos"] ?? m["uv"] ?? m["cr"] ?? "";
-        const credits = Number(creditsRaw) || 0;
+      toast({
+        title: "Éxito",
+        description: `Cursos de especialización para ${fileName.split(' ')[1]} cargados y asignados a ${studentForUpload.firstName}.`
+      });
 
-        return {
-          name: String(name).trim(),
-          code: String(code).trim(),
-          credits,
-          // grade/term los rellenará Home cuando cree los spec-* (como ya lo hace)
-        };
-      }).filter(c => c.name && String(c.name).trim() !== "");
-
-      const gl = mapGradeLevel(studentForSpec);
-      onSpecializationUpload(studentForSpec, parsed, gl);
-    } catch (err) {
-      console.error("Error leyendo Excel de especialización:", err);
-      // No usamos toasts aquí para no tocar tu UI; solo consola.
+    } catch (error: any) {
+      console.error("Error processing specialization file:", error);
+      toast({
+        variant: "destructive",
+        title: "Error al procesar archivo de especialización",
+        description: error.message || "Hubo un problema al leer el archivo.",
+      });
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      setStudentForSpec(null);
+      if (specializationFileInputRef.current) {
+        specializationFileInputRef.current.value = "";
+      }
     }
   };
 
-  // Agrupamos por batch para mostrar botón de borrar lote (sin tocar tu diseño original)
-  const batches = Array.from(
-    students.reduce((map, s) => {
-      if (!map.has(s.batchId)) map.set(s.batchId, []);
-      map.get(s.batchId)!.push(s);
-      return map;
-    }, new Map<string, Student[]>())
-  );
+
+  const filteredStudents = students.filter(student => {
+    const matchesSearchTerm = 
+      student.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.studentId.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesGradeLevel = 
+      gradeLevelFilter === 'Todos' || 
+      student.gradeLevel.toLowerCase().includes(gradeLevelFilter.toLowerCase());
+
+    return matchesSearchTerm && matchesGradeLevel;
+  });
+
+  const getBatchDisplayName = (batchId: string) => {
+    const parts = batchId.split('-');
+    const grade = parts[0];
+    const timestamp = new Date(parseInt(parts[1])).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `Lote: ${grade} @ ${timestamp}`;
+  }
 
   return (
-    <div className="w-full max-w-7xl mx-auto">
-      {/* Barra superior igual que el resto de pantallas */}
-      <Header onReset={onReset} />
-
-      {/* Input oculto para subir Excel de especialización */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleSpecFileChange}
-        accept=".xlsx,.xls"
-        className="hidden"
-      />
-
-      <div className="bg-white shadow-2xl p-4 mt-4">
-        {/* Encabezado con logo y título */}
-        <div className="flex items-center justify-between border-b-4 border-blue-900 pb-2 mb-4">
-          <div className="flex items-center gap-3">
-            <Image src={logoUrl} alt="Logo" width={56} height={56} className="rounded" crossOrigin="anonymous" />
-            <div>
-              <h2 className="text-xl font-bold text-blue-900">Consortium Universitas</h2>
-              <p className="text-sm text-gray-500">Selecciona un estudiante o carga su especialización</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabla: Nombre | Especialización | Ver reporte */}
-        <ScrollArea className="w-full">
-          <div className="min-w-[720px]">
-            <div className="grid grid-cols-3 gap-2 px-2 py-2 bg-gray-50 border-b">
-              <div className="font-semibold">Estudiante</div>
-              <div className="font-semibold">Especialización</div>
-              <div className="font-semibold">Acciones</div>
-            </div>
-
-            {batches.map(([batchId, group]) => (
-              <div key={batchId} className="border rounded-md my-4">
-                <div className="flex items-center justify-between px-3 py-2 bg-gray-100 border-b">
-                  <div className="text-sm font-semibold">Lote: {batchId}</div>
-                  <Button variant="outline" size="sm" onClick={() => onDeleteBatch(batchId)}>
-                    Eliminar lote
-                  </Button>
+    <div className="w-full max-w-4xl">
+        <input type="file" ref={specializationFileInputRef} onChange={handleSpecializationFileChange} className="hidden" accept=".xlsx, .xls" />
+        <Header onReset={onReset} />
+        <Card className="mt-8 shadow-2xl">
+            <CardHeader>
+                <CardTitle className="text-2xl">Lista de Estudiantes Cargados</CardTitle>
+                <CardDescription>
+                Busca y selecciona un estudiante para ver su reporte académico detallado.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex justify-center gap-2 mb-4 flex-wrap">
+                    <Button variant={gradeLevelFilter === 'Todos' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Todos')}>Todos</Button>
+                    <Button variant={gradeLevelFilter === 'Técnico' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Técnico')}>Técnico</Button>
+                    <Button variant={gradeLevelFilter === 'Licenciatura' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Licenciatura')}>Licenciatura</Button>
+                    <Button variant={gradeLevelFilter === 'Maestria' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Maestria')}>Maestría</Button>
+                    <Button variant={gradeLevelFilter === 'Doctorado' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Doctorado')}>Doctorado</Button>
+                    <Button variant={gradeLevelFilter === 'Posdoctorado' ? 'default' : 'outline'} onClick={() => setGradeLevelFilter('Posdoctorado')}>Pos Doctorado</Button>
                 </div>
-
-                {group.map((s) => (
-                  <div
-                    key={s.studentId}
-                    className="grid grid-cols-3 gap-2 items-center px-3 py-3 border-b last:border-0"
-                  >
-                    {/* Columna 1: Nombre */}
-                    <div className="truncate">
-                      <div className="font-medium">
-                        {s.firstName} {s.lastName}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {s.studentId} • {s.gradeLevel}
-                      </div>
+                <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                    type="text"
+                    placeholder="Buscar por nombre, apellido o ID..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                />
+                </div>
+                <ScrollArea className="h-96 w-full rounded-md border">
+                <div className="p-4">
+                    {filteredStudents.length > 0 ? (
+                    <ul className="space-y-2">
+                        {filteredStudents.map((student) => (
+                        <li key={student.studentId}>
+                            <div className="flex items-center justify-between rounded-md p-3 transition-colors hover:bg-gray-100">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                                        <User className="h-6 w-6 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-md">{`${student.firstName} ${student.lastName}`}</p>
+                                        <p className="text-sm text-gray-500">{`ID: ${student.studentId} | ${student.gradeLevel}`}</p>
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-xs font-mono text-gray-400">{getBatchDisplayName(student.batchId)}</p>
+                                          <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                              <button className="text-red-500 hover:text-red-700 transition-colors">
+                                                <Trash2 className="h-3 w-3"/>
+                                              </button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                <AlertDialogTitle>
+                                                  <div className="flex items-center gap-2">
+                                                    <ShieldAlert className="h-6 w-6 text-destructive"/>
+                                                    ¿Estás seguro de eliminar este lote?
+                                                  </div>
+                                                </AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                  Esta acción es irreversible. Se eliminarán todos los estudiantes asociados al lote <strong>{getBatchDisplayName(student.batchId)}</strong>. Esto puede incluir estudiantes que no están visibles actualmente si tienes filtros aplicados.
+                                                </AlertDialogDescription>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => onDeleteBatch(student.batchId)} className="bg-destructive hover:bg-destructive/90">
+                                                  Sí, eliminar lote
+                                                </AlertDialogAction>
+                                              </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                          </AlertDialog>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button variant="outline" onClick={() => handleSpecializationUploadClick(student)}>
+                                      <UploadCloud className="mr-2 h-4 w-4" />
+                                      Especialización
+                                  </Button>
+                                  <Button onClick={() => onSelectStudent(student)}>
+                                      <FileText className="mr-2 h-4 w-4" />
+                                      Ver Reporte
+                                  </Button>
+                                </div>
+                            </div>
+                        </li>
+                        ))}
+                    </ul>
+                    ) : (
+                    <div className="flex flex-col items-center justify-center p-8 text-center text-gray-500">
+                        <Search className="h-12 w-12 mb-4" />
+                        <p className="font-semibold">No se encontraron estudiantes</p>
+                        <p className="text-sm">Intenta con otro término de búsqueda o cambia el filtro de nivel.</p>
                     </div>
-
-                    {/* Columna 2: Botón Especialización (sube Excel) */}
-                    <div>
-                      <Button
-                        variant="outline"
-                        onClick={() => handleOpenSpecExcel(s)}
-                        className="w-full"
-                      >
-                        Especialización
-                      </Button>
-                    </div>
-
-                    {/* Columna 3: Ver reporte */}
-                    <div className="flex justify-start">
-                      <Button onClick={() => onSelectStudent(s)}>Ver reporte</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
+                    )}
+                </div>
+                </ScrollArea>
+            </CardContent>
+            <CardFooter>
+                 <p className="text-sm text-gray-500">{`${filteredStudents.length} de ${students.length} estudiante(s) mostrados.`}</p>
+            </CardFooter>
+        </Card>
     </div>
   );
 }
+
+    

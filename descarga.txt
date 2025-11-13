@@ -1,0 +1,5 @@
+...]]></content>` contiene **todo el código** que va dentro de ese archivo.
+
+3.  **Copia y Pega:**
+    *   En tu escritorio, crea las carpetas y el archivo con el nombre exacto que te indiqué en la etiqueta `<file>`.
+    *   Selecciona y copia **todo** el texto que está dentro de la etiqueta `<![CDATA[...

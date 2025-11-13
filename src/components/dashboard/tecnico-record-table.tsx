@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Course, Student } from "@/lib/academic-data";
-import { inductionCourses, tecnicoCursosProfesionales } from "@/lib/academic-data";
+import { inductionCourses, tecnicoCursosBasicos, tecnicoCursosProfesionales } from "@/lib/academic-data";
 
 type TecnicoRecordTableProps = {
   records: Course[];
@@ -154,6 +154,7 @@ export function TecnicoRecordTable({ records, student, onAverageCalculated, thes
             </TableHeader>
             <TableBody>
                 {renderCourses(studentCourses.filter(c => inductionCourses.some(ic => ic.name === c.name)), "Cursos de Inducción")}
+                {renderCourses(studentCourses.filter(c => tecnicoCursosBasicos.some(tcb => tcb.name === c.name)), "Cursos Básicos")}
                 {renderCourses(studentCourses.filter(c => tecnicoCursosProfesionales.some(lcp => lcp.name === c.name) && !c.id.startsWith('spec-')), "Cursos Optativos Profesionales")}
                 {renderCourses(specializationCourses, "Cursos Optativos de Especialización", true)}
                 

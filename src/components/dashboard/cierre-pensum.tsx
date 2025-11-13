@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Student } from "@/lib/academic-data";
@@ -5,6 +6,7 @@ import Image from "next/image";
 
 type CierrePensumProps = {
   student: Student;
+  universityName: string;
   counselorSignature: string | null;
   secretarySignature: string | null;
   coordinatorSignature: string | null;
@@ -23,14 +25,14 @@ const SignatureBox = ({ title, signature }: { title: string; signature: string |
   </div>
 );
 
-export function CierrePensum({ student, counselorSignature, secretarySignature, coordinatorSignature }: CierrePensumProps) {
+export function CierrePensum({ student, universityName, counselorSignature, secretarySignature, coordinatorSignature }: CierrePensumProps) {
   const studentName = `${student.firstName} ${student.lastName}`;
 
   return (
     <div className="p-8 bg-white text-gray-800 font-serif text-lg leading-relaxed">
       
       <p className="mb-8 text-center">
-        La secretaría académica de <span className="font-bold">{student.university}</span> de California.
+        La secretaría académica de <span className="font-bold">{universityName}</span> de California.
       </p>
 
       <p className="mb-8 text-center">

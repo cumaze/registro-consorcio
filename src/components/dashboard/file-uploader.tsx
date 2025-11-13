@@ -1,5 +1,5 @@
 "use client";
-
+import { useUniversityName } from "@/context/UniversityNameContext";
 import { useRef, useState } from "react";
 import { UploadCloud, Image as ImageIcon, Edit } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -12,6 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import type { Student, Course } from "@/lib/academic-data";
 import {
@@ -22,20 +24,9 @@ import {
   licenciaturaCursosProfesionales,
   doctoradoCursosBasicos,
   doctoradoCursosProfesionales,
+  tecnicoCursosBasicos,
   tecnicoCursosProfesionales,
 } from "@/lib/academic-data";
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
 
 type FileUploaderProps = {
   onUpload: (data: {
@@ -48,9 +39,15 @@ type FileUploaderProps = {
     event: React.ChangeEvent<HTMLInputElement>,
     setter: React.Dispatch<React.SetStateAction<string | null>>
   ) => void;
-  setCounselorSignature: React.Dispatch<React.SetStateAction<string | null>>;
-  setSecretarySignature: React.Dispatch<React.SetStateAction<string | null>>;
-  setCoordinatorSignature: React.Dispatch<React.SetStateAction<string | null>>;
+  setCounselorSignature: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
+  setSecretarySignature: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
+  setCoordinatorSignature: React.Dispatch<
+    React.SetStateAction<string | null>
+  >;
 };
 
 type GradeLevel =
@@ -60,15 +57,18 @@ type GradeLevel =
   | "Técnico"
   | "Posdoctorado";
 
-// shuffle determinístico por seed
+// Function to shuffle an array and pick the first N elements
 const getRandomSubarray = (arr: any[], n: number, seed: string) => {
   let a = 1;
-  for (let i = 0; i < seed.length; i++) a = (a + seed.charCodeAt(i)) % 1000;
-  const rnd = () => {
+  for (let i = 0; i < seed.length; i++) {
+    a = (a + seed.charCodeAt(i)) % 1000;
+  }
+  const pseudoRandom = () => {
     a = (a * 9301 + 49297) % 233280;
     return a / 233280;
   };
-  const shuffled = [...arr].sort(() => rnd() - 0.5);
+
+  const shuffled = [...arr].sort(() => pseudoRandom() - 0.5);
   return shuffled.slice(0, n);
 };
 
@@ -92,12 +92,11 @@ export function FileUploader({
   setSecretarySignature,
   setCoordinatorSignature,
 }: FileUploaderProps) {
-  // -------- estado nombre visible en pantalla inicial --------
-  const DEFAULT_NAME = "Consortium Universitas";
-  const [displayName, setDisplayName] = useState<string>(DEFAULT_NAME);
-  const [openNameDialog, setOpenNameDialog] = useState(false);
-  const [tempName, setTempName] = useState<string>(displayName);
-  // -----------------------------------------------------------
+  const { universityName, setUniversityName, resetUniversityName } =
+    useUniversityName();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [tempName, setTempName] = useState(universityName);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -116,10 +115,11 @@ export function FileUploader({
     logoInputRef.current?.click();
   };
 
-  const handleNameSave = () => {
-    const val = (tempName || "").trim();
-    setDisplayName(val.length ? val : DEFAULT_NAME);
-    setOpenNameDialog(false);
+  const handleSaveInstitutionName = () => {
+    setUniversityName(
+      tempName.trim() === "" ? "Consortium Universitas" : tempName
+    );
+    setEditOpen(false);
   };
 
   const handleFileChange = async (
@@ -129,11 +129,11 @@ export function FileUploader({
     const gradeLevelForUpload = currentGradeLevelRef.current;
 
     if (file) {
-      const fileName = file
-        .name
+      const fileName = file.name
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
+
       let isValid = false;
       let expectedKeyword = "";
 
@@ -143,7 +143,8 @@ export function FileUploader({
           expectedKeyword = "licenciatura";
           break;
         case "Maestria":
-          isValid = fileName.includes("maestria");
+          isValid =
+            fileName.includes("maestria") || fileName.includes("maestría");
           expectedKeyword = "maestria";
           break;
         case "Doctorado":
@@ -158,7 +159,9 @@ export function FileUploader({
           isValid =
             fileName.includes("posdoctorado") ||
             fileName.includes("pos doctorado") ||
-            fileName.includes("postdoctorado");
+            fileName.includes("postdoctorado") ||
+            fileName.includes("estudiantes pos doctorado") ||
+            fileName.includes("estudiantes postdoctorado");
           expectedKeyword = "posdoctorado";
           break;
       }
@@ -169,6 +172,7 @@ export function FileUploader({
           title: "Archivo incorrecto",
           description: `El nombre del archivo debe contener la palabra '${expectedKeyword}'.`,
         });
+
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -181,7 +185,7 @@ export function FileUploader({
         const studentSheetName = workbook.SheetNames[0];
         const studentWorksheet = workbook.Sheets[studentSheetName];
         if (!studentWorksheet) {
-          throw new Error(`La primera hoja de cálculo no pudo ser leída.`);
+          throw new Error("La primera hoja no pudo ser leída.");
         }
         const studentsJsonArray = XLSX.utils.sheet_to_json(studentWorksheet, {
           raw: false,
@@ -189,9 +193,7 @@ export function FileUploader({
         });
 
         if (studentsJsonArray.length === 0) {
-          throw new Error(
-            `La primera hoja de cálculo (Estudiantes) está vacía.`
-          );
+          throw new Error("La hoja de ESTUDIANTES está vacía.");
         }
 
         const students: Student[] = studentsJsonArray.map(
@@ -215,7 +217,8 @@ export function FileUploader({
 
             return {
               batchId: batchId,
-              university: lookupStudent["nombredelauniversidad"] || "N/A",
+              university:
+                lookupStudent["nombredelauniversidad"] || "N/A",
               school: lookupStudent["nombredelafacultad"] || "N/A",
               firstName: lookupStudent["nombrealumno"] || "N/A",
               lastName: lookupStudent["apellidoalumno"] || "N/A",
@@ -227,18 +230,23 @@ export function FileUploader({
               assignedTutor: "N/A",
               emphasis: "N/A",
               transferCredits:
-                Number(lookupStudent["creditostransferidospreviamente"]) || 0,
+                Number(
+                  lookupStudent["creditostransferidospreviamente"]
+                ) || 0,
               workExperienceCredits:
                 Number(
                   lookupStudent["creditosporexpiritualaboral"] ||
                     lookupStudent["creditosporexperiencialaboral"]
                 ) || 0,
               meritCredits:
-                Number(lookupStudent["creditosobtenidospormeritodeestudio"]) ||
-                0,
+                Number(
+                  lookupStudent["creditosobtenidospormeritodeestudio"]
+                ) || 0,
               gradeLevel: gradeLevelForUpload,
               thesisCredits:
-                Number(lookupStudent["creditosportesisdegraduacion"]) ||
+                Number(
+                  lookupStudent["creditosportesisdegraduacion"]
+                ) ||
                 (gradeLevelForUpload === "Técnico"
                   ? 10
                   : gradeLevelForUpload === "Posdoctorado"
@@ -246,9 +254,11 @@ export function FileUploader({
                   : 0),
               curriculumCloseDate:
                 lookupStudent["nofechadecierredelpensum"] || "N/A",
-              affectation: lookupStudent["nombredelafacultad"] || "N/A",
+              affectation:
+                lookupStudent["nombredelafacultad"] || "N/A",
               average: Number(lookupStudent["promedio"]) || 0,
-              spanishGrades: spanishGrades.length > 0 ? spanishGrades : [],
+              spanishGrades:
+                spanishGrades.length > 0 ? spanishGrades : [],
               careerName:
                 lookupStudent["nombredelacarrera"] ||
                 lookupStudent["carrera"] ||
@@ -261,19 +271,20 @@ export function FileUploader({
         const coursesWorksheet = workbook.Sheets[coursesSheetName];
         let coursesByStudent: Record<string, Course[]> = {};
 
-        // inicializar
         students.forEach((student) => {
           coursesByStudent[student.studentId] = [];
         });
 
-        // cursos automáticos por nivel
         students.forEach((student) => {
           const gradeLevel = student.gradeLevel.toLowerCase();
           let studentCourses: Partial<Course>[] = [];
 
           if (gradeLevel.includes("licenciatura")) {
             studentCourses = [
-              ...inductionCourses.map((c) => ({ ...c, id: `ind-${c.name}` })),
+              ...inductionCourses.map((c) => ({
+                ...c,
+                id: `ind-${c.name}`,
+              })),
               ...licenciaturaCursosBasicos.map((c) => ({
                 ...c,
                 id: `lic-bas-${c.name}`,
@@ -282,7 +293,10 @@ export function FileUploader({
                 licenciaturaCursosProfesionales,
                 10,
                 student.studentId + "lic-prof"
-              ).map((c) => ({ ...c, id: `lic-prof-${c.name}` })),
+              ).map((c) => ({
+                ...c,
+                id: `lic-prof-${c.name}`,
+              })),
             ];
           } else if (
             gradeLevel.includes("doctorado") ||
@@ -300,7 +314,10 @@ export function FileUploader({
               doctoradoCursosProfesionales,
               4,
               student.studentId + "doc-prof"
-            ).map((c) => ({ ...c, id: `doc-prof-${c.name}` }));
+            ).map((c) => ({
+              ...c,
+              id: `doc-prof-${c.name}`,
+            }));
 
             let allDoctorateCourses = [
               ...mandatoryInduction,
@@ -311,20 +328,33 @@ export function FileUploader({
             allDoctorateCourses = allDoctorateCourses.sort(
               () => Math.random() - 0.5
             );
+
             studentCourses = allDoctorateCourses;
           } else if (gradeLevel.includes("técnico")) {
             studentCourses = [
-              ...inductionCourses.map((c) => ({ ...c, id: `ind-${c.name}` })),
+              ...inductionCourses.map((c) => ({
+                ...c,
+                id: `ind-${c.name}`,
+              })),
+              ...tecnicoCursosBasicos.map((c) => ({
+                ...c,
+                id: `tec-bas-${c.name}`,
+              })),
               ...getRandomSubarray(
                 tecnicoCursosProfesionales,
                 5,
                 student.studentId + "tec-prof"
-              ).map((c) => ({ ...c, id: `tec-prof-${c.name}` })),
+              ).map((c) => ({
+                ...c,
+                id: `tec-prof-${c.name}`,
+              })),
             ];
           } else {
-            // Maestría
             studentCourses = [
-              ...inductionCourses.map((c) => ({ ...c, id: `ind-${c.name}` })),
+              ...inductionCourses.map((c) => ({
+                ...c,
+                id: `ind-${c.name}`,
+              })),
               ...maestriaCursosBasicos.map((c) => ({
                 ...c,
                 id: `bas-${c.name}`,
@@ -333,9 +363,13 @@ export function FileUploader({
                 professionalCourses,
                 5,
                 student.studentId + "prof"
-              ).map((c) => ({ ...c, id: `prof-${c.name}` })),
+              ).map((c) => ({
+                ...c,
+                id: `prof-${c.name}`,
+              })),
             ];
           }
+
           coursesByStudent[student.studentId].push(
             ...(studentCourses as Course[])
           );
@@ -379,208 +413,197 @@ export function FileUploader({
           title: "Error al procesar el archivo",
           description:
             error.message ||
-            "Hubo un problema al leer tu archivo de Excel. Revisa el formato y los nombres de las hojas.",
+            "Hubo un problema al leer tu archivo de Excel.",
         });
       } finally {
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     }
   };
 
   return (
-    <>
-      {/* Diálogo Cambiar nombre */}
-      <AlertDialog open={openNameDialog} onOpenChange={setOpenNameDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cambiar nombre</AlertDialogTitle>
-            <AlertDialogDescription>
-              Este nombre solo dura mientras la app esté abierta.
-              Al reiniciar, vuelve a <b>{DEFAULT_NAME}</b>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="grid gap-3">
+    <Card className="w-full max-w-lg animate-fade-in-up shadow-2xl">
+      <CardHeader className="text-center">
+        <div className="mx-auto flex items-center gap-4">
+          <Image
+            src={logoUrl}
+            alt="Logo"
+            width={64}
+            height={64}
+            className="rounded-full"
+            crossOrigin="anonymous"
+          />
+          <CardTitle className="font-headline text-3xl text-primary">
+            {universityName}
+          </CardTitle>
+        </div>
+        <CardDescription className="text-md pt-4">
+          Sube tu archivo de Excel, el logo y las firmas para generar los reportes.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="flex flex-col items-center gap-4 p-6 pt-2">
+
+        {/* Botón verde para cambiar el nombre de la institución */}
+        <Button
+          className="w-full font-bold text-white"
+          style={{ backgroundColor: "#0f6d45" }}
+          size="lg"
+          onClick={() => {
+            setTempName(universityName);
+            setEditOpen(true);
+          }}
+        >
+          Cambiar nombre institución
+        </Button>
+
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Modificar nombre de la institución</DialogTitle>
+            </DialogHeader>
+
             <Input
               value={tempName}
               onChange={(e) => setTempName(e.target.value)}
-              placeholder="Escribe el nombre a mostrar"
+              placeholder="Escribe el nuevo nombre..."
+              className="mt-4"
             />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleNameSave}>
-              Guardar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
-      <Card className="w-full max-w-lg animate-fade-in-up shadow-2xl">
-        <CardHeader className="text-center">
-          {/* Encabezado: favicon + texto + botón cambiar nombre */}
-          <div className="mx-auto mb-2 flex items-center justify-center gap-3">
-            <Image
-              src="/favicon.png"
-              alt="Favicon"
-              width={32}
-              height={32}
-              priority
-            />
-            <CardTitle className="font-headline text-3xl text-primary">
-              {displayName}
-            </CardTitle>
-            <Button
-              onClick={() => {
-                setTempName(displayName);
-                setOpenNameDialog(true);
-              }}
-              className="ml-2"
-            >
-              Cambiar nombre
-            </Button>
-          </div>
+            <div className="flex justify-between mt-6">
+              <Button variant="secondary" onClick={resetUniversityName}>
+                Restablecer por defecto
+              </Button>
 
-          <CardDescription className="text-md">
-            Sube tu archivo de Excel, el logo y las firmas para generar los
-            reportes.
-          </CardDescription>
-        </CardHeader>
+              <Button onClick={handleSaveInstitutionName} className="bg-blue-700 text-white">
+                Guardar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
-        <CardContent className="flex flex-col items-center gap-4 p-6 pt-2">
-          {/* inputs ocultos */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            className="hidden"
-            accept=".xlsx, .xls"
-          />
-          <input
-            type="file"
-            ref={logoInputRef}
-            onChange={onLogoUpload}
-            className="hidden"
-            accept="image/png, image/jpeg, image/svg+xml"
-          />
-          <input
-            type="file"
-            ref={counselorSignatureRef}
-            onChange={(e) => onSignatureUpload(e, setCounselorSignature)}
-            className="hidden"
-            accept="image/*"
-          />
-          <input
-            type="file"
-            ref={secretarySignatureRef}
-            onChange={(e) => onSignatureUpload(e, setSecretarySignature)}
-            className="hidden"
-            accept="image/*"
-          />
-          <input
-            type="file"
-            ref={coordinatorSignatureRef}
-            onChange={(e) => onSignatureUpload(e, setCoordinatorSignature)}
-            className="hidden"
-            accept="image/*"
-          />
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          className="hidden"
+          accept=".xlsx, .xls"
+        />
+        <input
+          type="file"
+          ref={logoInputRef}
+          onChange={onLogoUpload}
+          className="hidden"
+          accept="image/png, image/jpeg, image/svg+xml"
+        />
+        <input
+          type="file"
+          ref={counselorSignatureRef}
+          onChange={(e) => onSignatureUpload(e, setCounselorSignature)}
+          className="hidden"
+          accept="image/*"
+        />
+        <input
+          type="file"
+          ref={secretarySignatureRef}
+          onChange={(e) => onSignatureUpload(e, setSecretarySignature)}
+          className="hidden"
+          accept="image/*"
+        />
+        <input
+          type="file"
+          ref={coordinatorSignatureRef}
+          onChange={(e) =>
+            onSignatureUpload(e, setCoordinatorSignature)
+          }
+          className="hidden"
+          accept="image/*"
+        />
 
-          {/* Botones importar */}
-          <div className="grid grid-cols-1 gap-2 w-full">
-            <Button
-              onClick={() => handleExcelButtonClick("Técnico")}
-              size="lg"
-              className="w-full font-bold"
-            >
-              <UploadCloud className="mr-2 h-5 w-5" />
-              Importar Técnico (Excel)
-            </Button>
-            <Button
-              onClick={() => handleExcelButtonClick("Licenciatura")}
-              size="lg"
-              className="w-full font-bold"
-            >
-              <UploadCloud className="mr-2 h-5 w-5" />
-              Importar Licenciatura (Excel)
-            </Button>
-            <Button
-              onClick={() => handleExcelButtonClick("Maestria")}
-              size="lg"
-              className="w-full font-bold"
-            >
-              <UploadCloud className="mr-2 h-5 w-5" />
-              Importar Maestría (Excel)
-            </Button>
-            <Button
-              onClick={() => handleExcelButtonClick("Doctorado")}
-              size="lg"
-              className="w-full font-bold"
-            >
-              <UploadCloud className="mr-2 h-5 w-5" />
-              Importar Doctorado (Excel)
-            </Button>
-            <Button
-              onClick={() => handleExcelButtonClick("Posdoctorado")}
-              size="lg"
-              className="w-full font-bold"
-            >
-              <UploadCloud className="mr-2 h-5 w-5" />
-              Importar Pos Doctorado (Excel)
-            </Button>
-          </div>
+        <div className="grid grid-cols-1 gap-2 w-full">
+          <Button
+            onClick={() => handleExcelButtonClick("Técnico")}
+            size="lg"
+            className="w-full font-bold"
+          >
+            <UploadCloud className="mr-2 h-5 w-5" />
+            Importar Técnico (Excel)
+          </Button>
+          <Button
+            onClick={() => handleExcelButtonClick("Licenciatura")}
+            size="lg"
+            className="w-full font-bold"
+          >
+            <UploadCloud className="mr-2 h-5 w-5" />
+            Importar Licenciatura (Excel)
+          </Button>
+          <Button
+            onClick={() => handleExcelButtonClick("Maestria")}
+            size="lg"
+            className="w-full font-bold"
+          >
+            <UploadCloud className="mr-2 h-5 w-5" />
+            Importar Maestría (Excel)
+          </Button>
+          <Button
+            onClick={() => handleExcelButtonClick("Doctorado")}
+            size="lg"
+            className="w-full font-bold"
+          >
+            <UploadCloud className="mr-2 h-5 w-5" />
+            Importar Doctorado (Excel)
+          </Button>
+          <Button
+            onClick={() => handleExcelButtonClick("Posdoctorado")}
+            size="lg"
+            className="w-full font-bold"
+          >
+            <UploadCloud className="mr-2 h-5 w-5" />
+            Importar Pos Doctorado (Excel)
+          </Button>
+        </div>
 
-          {/* PREVIEW del logo SUBIDO (centrado) */}
-          <div className="w-full flex justify-center pt-2">
-            <Image
-              src={logoUrl}
-              alt="Logo cargado"
-              width={96}
-              height={96}
-              className="rounded-md shadow"
-              crossOrigin="anonymous"
-            />
-          </div>
-
-          {/* Zona de subir logo y firmas (dos columnas) */}
-          <div className="grid grid-cols-2 gap-2 w-full">
-            <Button
-              onClick={handleLogoButtonClick}
-              size="lg"
-              variant="outline"
-              className="w-full font-bold"
-            >
-              <ImageIcon className="mr-2 h-5 w-5" />
-              Subir Logo
-            </Button>
-            <Button
-              onClick={() => counselorSignatureRef.current?.click()}
-              size="lg"
-              variant="outline"
-              className="w-full font-bold"
-            >
-              <Edit className="mr-2 h-5 w-5" />
-              Firma Consejero
-            </Button>
-            <Button
-              onClick={() => secretarySignatureRef.current?.click()}
-              size="lg"
-              variant="outline"
-              className="w-full font-bold"
-            >
-              <Edit className="mr-2 h-5 w-5" />
-              Firma Secretaria
-            </Button>
-            <Button
-              onClick={() => coordinatorSignatureRef.current?.click()}
-              size="lg"
-              variant="outline"
-              className="w-full font-bold"
-            >
-              <Edit className="mr-2 h-5 w-5" />
-              Firma Coordinador
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </>
+        <div className="grid grid-cols-2 gap-2 w-full">
+          <Button
+            onClick={handleLogoButtonClick}
+            size="lg"
+            variant="outline"
+            className="w-full font-bold"
+          >
+            <ImageIcon className="mr-2 h-5 w-5" />
+            Subir Logo
+          </Button>
+          <Button
+            onClick={() => counselorSignatureRef.current?.click()}
+            size="lg"
+            variant="outline"
+            className="w-full font-bold"
+          >
+            <Edit className="mr-2 h-5 w-5" />
+            Firma Consejero
+          </Button>
+          <Button
+            onClick={() => secretarySignatureRef.current?.click()}
+            size="lg"
+            variant="outline"
+            className="w-full font-bold"
+          >
+            <Edit className="mr-2 h-5 w-5" />
+            Firma Secretaria
+          </Button>
+          <Button
+            onClick={() => coordinatorSignatureRef.current?.click()}
+            size="lg"
+            variant="outline"
+            className="w-full font-bold"
+          >
+            <Edit className="mr-2 h-5 w-5" />
+            Firma Coordinador
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
